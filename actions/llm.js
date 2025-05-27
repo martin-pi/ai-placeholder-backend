@@ -1,6 +1,7 @@
 import { getLlama, LlamaChatSession } from "node-llama-cpp";
-
-const modelFilename = "Mistral-Small-3.1-24B-Base-2503.i1-IQ3_M.gguf";
+import fs from 'node:fs/promises';
+import * as readline from 'node:readline/promises';
+import { stdin as input, stdout as output } from 'node:process';
 
 const llm = {
   llama: null,
@@ -43,18 +44,39 @@ const llm = {
     
     
 
-    // TODO look in ./models for .gguf files.
-    fileNames = [];
+    // look in ./models for .gguf files.
+    var modelFilename = null;
+    var filenames = await fs.readdir('./models/');
+    filenames = filenames.filter((f) => {
+      return typeof f == 'string' && f.toLowerCase().includes('.gguf');
+    });
+
     if (filenames.length < 1) {
+      // We can't load a model that doesn't exist.
       console.error(`No .gguf models were found in ./models. LLM functionality will not be enabled.`);
       return;
     } else if (filenames.length == 1) {
-      // TODO There is only one file, use it.
+      // There is only one file, use it.
+      modelFilename = filenames[0];
     } else {
-      // TODO Let the user pick a file.
+      // Let the user select one of the files.
+      console.log(`Found multiple files in ./models. Pick which LLM you want to load:`);
+      for (let i = 0; i < filenames.length; i++) {
+        console.log(`\t${i}:\t${filenames[i]}`);
+      }
+      const rl = readline.createInterface({ input, output });
+      var index = await rl.question('Index: ');
+      rl.close();
+      index = Number(index);
+      if (!index || index < 0 || index >= filenames.length) {
+        console.error('Please input a valid index. Skipping LLM. LLM functionality will not be enabled.');
+        return;
+      }
+      modelFilename = filenames[index];
     }
-
     console.log(`Initializing LLM Model "${modelFilename}"...`);
+
+    
     const options = {
       //gpu: false,
       //logLevel: "debug",

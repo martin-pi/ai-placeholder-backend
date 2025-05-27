@@ -1,4 +1,4 @@
-# Combined AI Utility Server
+# AI Placeholder Server
 This is an all-in-one server to host AI features/models necessary to accelerate prototyping. Each section of this server has many production-ready equivalents that should be used when deploying.
 
 - This runs without GPU dependencies, albeit slowly. 
@@ -149,9 +149,7 @@ Provide the ability to simply instruct a model and get a direct response, as wel
 Internally, we mount a GGUF model using llama.cpp and wrap around that.
 #### Installing a GGUF
 1. Download a quantized .gguf model from huggingface or llama and place it in the `./models` directory. This was tested with `Mistral-Small-3.1-24B-Base-2503.i1-IQ3_M.gguf` from huggingface.
-1. Modify `modelFilename` in `./actions/llm.js` to match your model's filename (without /models).
-
-TODO Look for available models in the models directory. Let the user select one if there is more than one.
+1. On startup, the server will look for available models in the models directory. If there is more than one model present, you will be prompted to select one from a list.
 
 #### POST /llm/chat
 
