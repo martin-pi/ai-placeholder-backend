@@ -1,4 +1,4 @@
-# AI Placeholder Server
+# AI Placeholder
 This is an all-in-one server to host AI features/models necessary to accelerate prototyping. Each section of this server has many production-ready equivalents that should be used when deploying.
 
 - This runs without GPU dependencies, albeit slowly. 
@@ -6,7 +6,23 @@ This is an all-in-one server to host AI features/models necessary to accelerate 
 - There is no security on this server, as it is not meant to support any production applications.
 - We don't care about the presentation layer here, we're just providing a local API for all of the utilities and endpoints you will need as you build.
 
-## ⛏️ Data Extraction - Anything -> Markdown
+# Getting Started
+1. `git clone https://github.com/martin-pi/ai-placeholder-backend.git`
+1. `cd ai-placeholder-backend`
+1. `npm install`
+1. Download a quantized .gguf model from HuggingFace and place it in ./models
+1. `npm run serve`
+
+# Features
+- Data Extraction
+- Content Chunking
+- String Embedding
+- Vector Storage & Retrieval (RAG)
+- LLM Prompting
+
+
+
+## ⛏️ Data Extraction
 
 Given a file, return a markdown string of text extracted from the file. In some cases, a description of the content may be returned instead.
 - Images: Perform OCR to retrieve any text in the document. Try to use an image-to-text model to describe the image as well.
@@ -15,15 +31,16 @@ Given a file, return a markdown string of text extracted from the file. In some 
 
 #### POST /extract
 Send a file to this endpoint and it will attempt to extract some information about it, and return that information as markdown.
-`curl --request POST --url http://localhost:3001/extract --header 'Content-Type: multipart/form-data' --form 'file=@C:\Temp\example.docx'`
-```js
-MultipartFormData: { "file": File }
+```bash
+curl --request POST --url http://localhost:3001/extract --header 'Content-Type: multipart/form-data' --form 'file=@C:\Temp\example.docx'
 ```
 ```js
 Response: { "content": "# Title\n\nEither the content of your file, or a description of it." }
 ```
 
-## 📊 Embeddings - Xenova/gte-base ONNX Model
+## 📊 Embeddings
+
+This application uses the **Xenova/gte-base ONNX** model to embed text.
 
 Rather than perform expensive string comparisons on an entire database of text, we transform each entry into a standard multidimensional vector. This is performed by an embedding model. It's important that we use the same embedding model for everything. Both to embed entries for storage, as well as embed queries for lookups.
 
@@ -34,7 +51,7 @@ If we want to work with a really long string, we will need to split the string i
 
 Chunks should be measured in tokens, or as a fallback, characters.
 
-> For embeddings, chunking should be done internally. The end user shouldn't need to manually split strings.
+> Note: When calling /embed, chunking is done internally. The end user shouldn't need to manually split strings.
 
 ```js
 Request: { "content": "This is a long string. It will be split up into chunks based on sentence structure.", "chunkSize": 60 }
@@ -84,7 +101,10 @@ Response: {
 }
 ```
 
-## 🗃️ Vector Storage/Lookup - SQLite + SQLite-Vec
+## 🗃️ Vector Storage/Lookup
+
+This application uses **SQLite + SQLite-Vec** to store and query vectors.
+
 Now that we have an embedding, we can store it, along with whatever other information is relevant. This gives us a mechanism for long term text data storage. Treat this like a fact/memory store. As your application interacts with your users, pull relevant snippets from storage to inform and reinforce the LLM.
 
 Since we're only interested in storing data for vectors here, we simplify things into collections. Each collection should represent a different corpus or use case, such as "webpages" or "internalKnowledge".
@@ -146,7 +166,7 @@ Response: [
 ## 💬 LLM Endpoints
 Provide the ability to simply instruct a model and get a direct response, as well as the ability to provide an array of chat history, and get a new message in response.
 
-Internally, we mount a GGUF model using llama.cpp and wrap around that.
+Internally, we mount a [GGUF](https://huggingface.co/docs/hub/gguf) model using [llama.cpp](https://www.npmjs.com/package/node-llama-cpp) and wrap around that.
 #### Installing a GGUF
 1. Download a quantized .gguf model from huggingface or llama and place it in the `./models` directory. This was tested with `Mistral-Small-3.1-24B-Base-2503.i1-IQ3_M.gguf` from huggingface.
 1. On startup, the server will look for available models in the models directory. If there is more than one model present, you will be prompted to select one from a list.
