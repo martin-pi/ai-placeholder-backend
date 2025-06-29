@@ -7,12 +7,26 @@ const chunk = {
     const chunkSize = req.body?.chunkSize;
     if (!chunkSize || typeof chunkSize != 'number') return res.status(400).send('Invalid chunkSize.');
     const method = req.body?.method ?? 'tokens';
-    if (!method || ['tokens', 'characters'].includes(method)) return res.status(400).send('Invalid method. Must be "tokens" or "characters", or undefined.');
+    if (!method || !(['tokens', 'characters'].includes(method))) return res.status(400).send('Invalid method. Must be "tokens" or "characters", or undefined.');
+    const detailed = req.body?.detailed ?? false;
 
     try {
       let chunks = [];
       if (method == 'characters') chunk = chunks._chunkByCharacters(content, chunkSize);
       else chunks = chunk._chunkByTokens(content, chunkSize);
+
+      if (detailed) { // Return some additional details about each chunk.
+        var detailedChunks = [];
+        for (let i = 0; i < chunks.length; i++) {
+          let chunk = chunks[i];
+          detailedChunks.push({
+            content: chunk,
+            tokens: tokenize._tokenize(chunk).length,
+            index: i
+          });
+        }
+        return res.status(200).json({ chunks: detailedChunks});
+      }
 
       return res.status(200).json({ chunks: chunks });
     } catch(err) {
@@ -48,7 +62,18 @@ const chunk = {
 
   // Internal function to perform chunking operations using token count
   _chunkByTokens: function(content, tokenLimit) {
-    var chunks = content.split(/(?=[.!?;\n])|(?<=[.!?;\n])/gm);
+    var chunks = [];
+    if (Array.isArray(content)) {
+      chunks = [];
+      content.forEach((str) => {
+        chunks.push(str.split(/(?=[.!?;\n])|(?<=[.!?;\n])/gm));
+      });
+    } else if (typeof content === 'string') {
+      chunks = content.split(/(?=[.!?;\n])|(?<=[.!?;\n])/gm);
+    } else {
+      console.error(`_chunkByTokens: Content should be a string or array of strings.`);
+      return [];
+    }
 
     // Get as close to the token limit as possible without splitting sentences.
     for(let i = 0; i < chunks.length - 1; i++) {

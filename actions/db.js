@@ -10,7 +10,10 @@ const db = {
   createHandler: async function(req, res) {
     const collection = req.params.collection;
     if (typeof collection != 'string' || collection.length < 1) return res.status(400).send('Invalid collection.');
-    if (typeof content != 'string' || content.length < 1) return res.status(400).send('Invalid content.');
+    const content = req.body.content;
+    if ((typeof content != 'string' && !Array.isArray(content)) || content?.length < 1) return res.status(400).send('Invalid content.');
+    var source = req.params.source;
+    if (typeof source != 'string' || source.length < 1) source = 'unknown';
 
     try {
       await db._ingestContent(collection, content, source);
@@ -21,18 +24,31 @@ const db = {
     }
   },
 
-  // Query a collection for information.
+  // Query a collection (or a set of collections) for information.
   queryHandler: async function(req, res) {
     const collection = req.params.collection;
-    if (typeof collection != 'string' || collection.length < 1) return res.status(400).send('Invalid collection.');
+    if ((typeof collection != 'string' && !Array.isArray(collection)) || collection.length < 1) return res.status(400).send('Invalid collection.');
     const query = req.body?.query ?? req.params?.query ?? req.params?.q;
     if (typeof collection != 'string' || collection.length < 1) return res.status(400).send('Invalid query.');
     const k = req.body?.k ?? req.params ?.k ?? 3;
     if (typeof k != 'number' || k < 1) return res.status(400).send('Invalid k.');
     
     try {
-      const results = await db._queryContent(collection, query, k);
-      return res.status(200).json(results);
+      if (Array.isArray(collection)) {
+        // Search every collection and give the top k results across all of them.
+        var results = [];
+        collection.forEach(async (c) => {
+          var r = await db._queryContent(c, query, k);
+          r.collection = c;
+        });
+        results.sort((a, b) => b.score - a.score);
+        results = results.slice(0, k);
+        return res.status(200).json(results);
+      } else {
+        // Search a single collection.
+        const results = await db._queryContent(collection, query, k);
+        return res.status(200).json(results);
+      }
     } catch(err) {
       console.error(err);
       return res.status(500).send('An error occurred.');
@@ -84,8 +100,8 @@ const db = {
       source TEXT,
       sourceIndex INT NOT NULL,
       chunkId TEXT UNIQUE,
-      content TEXT,
-      embedding float[${embed.maxChunk}]
+      content TEXT NOT NULL,
+      embedding float[${embed.maxChunk}] NOT NULL
     );`;
 
     const result = db.sqlite.prepare(query, (err) => {
@@ -102,14 +118,19 @@ const db = {
   async _queryContent(collection, content, k) {
     var embedding = await embed._embedOne(content);
     var array = new Float32Array(embedding);
-    const query = `SELECT createdAt, source, sourceIndex, chunkId, content, vec_distance_cosine(embedding, ?) as distance FROM ${collection} ORDER BY distance DESC LIMIT ${k ?? 3};`;
-    var response = db.sqlite.prepare(query).get(array);
+    const query = `SELECT createdAt, source, sourceIndex, chunkId, content, vec_distance_cosine(embedding, ?) as distance FROM ${collection} ORDER BY distance ASC LIMIT ${k ?? 3};`;
+    var response = db.sqlite.prepare(query).all(array);
+    console.log(`Query of collection "${collection}" for "${content}" got ${response.length} results.`);
     return response ?? [];
   },
 
   async _ingestContent(collection, content, source) {
     if (typeof collection != 'string') throw new Error('_ingestContent requires a collection to be specified.');
-    if (typeof content != 'string') throw new Error('_ingestContent requires content to be a string.');
+    if (typeof content != 'string' && !Array.isArray(content)) throw new Error('_ingestContent requires content to be a string or array.');
+    if (content.length < 1) {
+      console.warn('Cannot ingest content with length 0.');
+      return;
+    }
 
     // Make a timestamp for all potential chunks to reference.
     const timestamp = new Date().toISOString();
@@ -117,6 +138,7 @@ const db = {
 
     // Chunk the content, and create an embedding for each chunk.
     var chunks = await embed._embed(content);
+    console.log(`Ingesting ${chunks.length} chunks of content into ${collection}...`);
 
     // Create a record for each chunk and store it.
     chunks.forEach(async (chunk, index) => {
@@ -134,6 +156,7 @@ const db = {
         console.error(`Could not ingest chunk: ${chunk.content}\n${err.message}`);
       }
     });
+    console.log(' Done.');
     return true;
   },
 
@@ -156,12 +179,13 @@ const db = {
     db.vecVersion = vecVersion;
     console.log(`\tSQLite Vec Version: ${db.vecVersion}`);
 
-    console.log('Running SQLite Vec Validations...');
-    await db._createCollection('test');
-    await db._ingestContent('test', 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.', 'loremipsum');
-    var result = await db._queryContent('test', 'lorem ipsum', 3);
-    if (Array.isArray(result) || result.length < 1) console.error('\tSomething went wrong.');
-    else console.log('\tDone.');
+    //console.log('Running SQLite Vec Validations...');
+    //await db._createCollection('test');
+    //await db._ingestContent('test', 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.', 'loremipsum');
+    //await db._ingestContent('test', ['Array of input items', 'myArray = ["asdfdsaasdfas"]'], 'loremipsum');
+    //var result = await db._queryContent('test', 'lorem ipsum', 3);
+    //if (!Array.isArray(result) || result.length < 1) console.error('\tSomething went wrong.');
+    //else console.log('\tDone.');
     
   }
 

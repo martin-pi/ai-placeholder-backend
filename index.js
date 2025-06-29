@@ -30,9 +30,12 @@ import db from './actions/db.js';
 app.get('/db/collection', db.listCollectionsHandler);
 app.post('/db/collection/new', db.createCollectionHandler);
 
+app.post('/db/collection/create', db.createHandler);
 app.post('/db/:collection/create', db.createHandler);
 //app.post('/db/:collection/delete', db.deleteHandler);
+app.post('/db/collection/search', db.queryHandler);
 app.post('/db/:collection/search', db.queryHandler);
+
 
 
 //app.post('/db/collection/truncate', db.truncateCollectionHandler);

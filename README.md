@@ -135,6 +135,7 @@ Request: {
 }
 ```
 #### POST /db/:collection/search
+OR: POST /db/collection/search
 Perform a vector search to get relevant content from your collection.
 ```js
 Request: { 

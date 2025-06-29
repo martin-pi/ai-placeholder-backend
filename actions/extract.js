@@ -6,6 +6,7 @@ const extract = {
   // Given a file, returns a markdown representation/description of that file.
   handler: async function(req, res) {
     // Start by extracting the file from the request with express-fileupload.
+    if (!req.files) return res.status(400).send('No files could be read from request.');
     const file = req.files.file;
     if (!file) return res.status(400).send('Missing file.');
     const content = file.data; // buffer.

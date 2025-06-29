@@ -23,9 +23,9 @@ const embed = {
     var results = [];
     if (Array.isArray(content)) {
       for (let i = 0; i < content.length; i++) {
-        var chunks = chunk._chunk(content[i], embed.maxChunk);
+        var chunks = chunk._chunkByTokens(content[i], embed.maxChunk);
         for (let j = 0; j < chunks.length; j++) {
-          const embedding = embed._embedOne(chunks[j])
+          const embedding = await embed._embedOne(chunks[j])
           results.push({
             content: chunks[j],
             embedding: embedding
